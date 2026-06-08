@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="glass_white">#30FFFFFF</color>
+    <color name="glass_border">#50FFFFFF</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#CCFFFFFF</color>
+    <color name="shutdown_red">#35FF453A</color>
+    <color name="reboot_blue">#35007AFF</color>
+    <color name="bg_start">#FF6B8DD6</color>
+    <color name="bg_end">#FF8E5CB8</color>
+</resources>

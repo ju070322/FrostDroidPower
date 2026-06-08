@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">电源控制</string>
+    <string name="title">电源控制</string>
+    <string name="subtitle">仿 iOS 液态玻璃风格</string>
+    <string name="shutdown">关机</string>
+    <string name="reboot">重启</string>
+    <string name="shutdown_desc">关闭设备</string>
+    <string name="reboot_desc">重新启动</string>
+    <string name="no_permission">需要系统权限才能执行此操作</string>
+    <string name="executing">正在执行…</string>
+    <string name="unsupported">此设备不支持该操作</string>
+</resources>
