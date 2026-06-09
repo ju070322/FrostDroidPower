@@ -275,40 +275,19 @@ public class MainActivity extends Activity {
     }
 
     private void openTool(int index) {
-        switch (index) {
-            case 0: // 水平仪
-                startActivity(new Intent(this, ToolsActivity.class)
-                        .putExtra("tool", "level"));
-                break;
-            case 1: // 尺子
-                startActivity(new Intent(this, ToolsActivity.class)
-                        .putExtra("tool", "ruler"));
-                break;
-            case 2: // 剪贴板
-                showClipboard();
-                break;
-            case 9: // 单位换算
-                startActivity(new Intent(this, ToolsActivity.class)
-                        .putExtra("tool", "converter"));
-                break;
-            case 10: // 倒计时
-                startActivity(new Intent(this, ToolsActivity.class)
-                        .putExtra("tool", "countdown"));
-                break;
-            case 11: // 白噪音
-                startActivity(new Intent(this, ToolsActivity.class)
-                        .putExtra("tool", "noise"));
-                break;
-            default:
-                showComingSoon(TOOLS[index][0]);
-                break;
+        String[] toolIds = {"level","ruler","clipboard","floatball","applock","album","cleaner","cpu","wifi","converter","countdown","noise","gif","ocr","ringtone","collage","clone"};
+        String id = (index < toolIds.length) ? toolIds[index] : "";
+        if ("clipboard".equals(id)) {
+            showClipboard();
+        } else {
+            startActivity(new Intent(this, ToolsActivity.class).putExtra("tool", id));
         }
     }
 
     private void showComingSoon(String name) {
         new AlertDialog.Builder(this)
                 .setTitle(name)
-                .setMessage(getString(R.string.coming_soon_desc))
+                .setMessage("\u5f00\u53d1\u4e2d...")
                 .setPositiveButton("知道了", null)
                 .show();
     }

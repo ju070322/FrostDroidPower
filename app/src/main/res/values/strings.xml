@@ -2,38 +2,11 @@
 <resources>
     <string name="app_name">FrostDroidPower</string>
     <string name="title">FrostDroidPower</string>
-    <string name="subtitle">❄️ Frost · Droid · Power</string>
-
-    <!-- Power Control -->
-    <string name="tab_power">电源控制</string>
-    <string name="tab_tools">工具箱</string>
-    <string name="shutdown">关机</string>
-    <string name="reboot">重启</string>
-    <string name="shutdown_desc">关闭设备</string>
-    <string name="reboot_desc">重新启动</string>
-    <string name="no_permission">需要系统权限才能执行此操作</string>
-    <string name="executing">正在执行…</string>
-    <string name="unsupported">此设备不支持该操作</string>
-
-    <!-- Tools -->
-    <string name="tool_level">水平仪</string>
-    <string name="tool_ruler">尺子</string>
-    <string name="tool_clipboard">剪贴板管理</string>
-    <string name="tool_floatball">悬浮球</string>
-    <string name="tool_applock">应用锁</string>
-    <string name="tool_album">私密相册</string>
-    <string name="tool_cleaner">垃圾清理</string>
-    <string name="tool_monitor">CPU/网速监控</string>
-    <string name="tool_wifi">WiFi分析仪</string>
-    <string name="tool_converter">单位换算</string>
-    <string name="tool_countdown">倒计时/纪念日</string>
-    <string name="tool_noise">白噪音</string>
-    <string name="tool_gif">GIF制作</string>
-    <string name="tool_ocr">OCR文字识别</string>
-    <string name="tool_ringtone">铃声制作</string>
-    <string name="tool_collage">拼图工具</string>
-    <string name="tool_clone">手机换机</string>
-
-    <string name="coming_soon">开发中…</string>
-    <string name="coming_soon_desc">此功能正在开发中，敬请期待</string>
+    <string name="subtitle">Power Control</string>
+    <string name="tab_power">Power</string>
+    <string name="tab_tools">Tools</string>
+    <string name="shutdown">Shutdown</string>
+    <string name="reboot">Reboot</string>
+    <string name="shutdown_desc">Power off device</string>
+    <string name="reboot_desc">Restart device</string>
 </resources>

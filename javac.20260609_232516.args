@@ -1,5 +1,0 @@
--cp
-C:\\Users\\ju070\\AppData\\Local\\Android\\Sdk\\platforms\\android-34\\android.jar
--d
-C:\\Users\\ju070\\AppData\\Local\\Temp\\classes
-app\\src\\main\\java\\com\\helloapp\\ToolsActivity.java

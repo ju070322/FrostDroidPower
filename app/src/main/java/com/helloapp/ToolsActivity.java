@@ -1,16 +1,28 @@
 package com.helloapp;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.TrafficStats;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.StatFs;
+import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.InputType;
+import android.text.format.Formatter;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -21,16 +33,20 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class ToolsActivity extends Activity {
-
+    private static final int PERMISSION_REQUEST = 2001;
     private String toolType;
     private TextView titleText;
-    private LinearLayout catRow;
     private LinearLayout contentArea;
 
     @Override
@@ -38,504 +54,467 @@ public class ToolsActivity extends Activity {
         super.onCreate(savedInstanceState);
         toolType = getIntent().getStringExtra("tool");
         if (toolType == null) toolType = "";
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundResource(R.drawable.gradient_bg);
-
-        // Top bar with back button
+        final ToolsActivity self = this;
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setPadding(20, 54, 20, 16);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-
-        final ToolsActivity self = this;
         Button backBtn = new Button(this);
         backBtn.setText("<");
         backBtn.setTextColor(0xFFFFFFFF);
         backBtn.setTextSize(20);
         backBtn.setBackgroundResource(R.drawable.glass_icon_bg);
         backBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) { self.finish(); }
+            @Override public void onClick(View v) { self.finish(); }
         });
-
         titleText = new TextView(this);
         titleText.setTextColor(0xFFFFFFFF);
         titleText.setTextSize(20);
         titleText.setGravity(Gravity.CENTER);
         titleText.setPadding(16, 0, 0, 0);
-
         topBar.addView(backBtn, 48, 48);
         topBar.addView(titleText, new LinearLayout.LayoutParams(0, -2, 1));
-
         ScrollView scroll = new ScrollView(this);
         scroll.setPadding(20, 8, 20, 20);
-
         contentArea = new LinearLayout(this);
         contentArea.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(contentArea, new ViewGroup.LayoutParams(-1, -1));
-
         root.addView(topBar, new LinearLayout.LayoutParams(-1, -2));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
         setContentView(root);
-
         if ("level".equals(toolType)) buildLevel();
         else if ("ruler".equals(toolType)) buildRuler();
         else if ("converter".equals(toolType)) buildConverter();
         else if ("countdown".equals(toolType)) buildCountdown();
         else if ("noise".equals(toolType)) buildWhiteNoise();
+        else if ("cpu".equals(toolType)) buildCpuMonitor();
+        else if ("network".equals(toolType)) buildNetworkMonitor();
+        else if ("cleaner".equals(toolType)) buildCleaner();
+        else if ("album".equals(toolType)) buildPrivateAlbum();
+        else if ("wifi".equals(toolType)) buildWifiAnalyzer();
+        else if ("floatball".equals(toolType)) showSysPerm("Floating Ball", Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+        else if ("applock".equals(toolType)) showSysPerm("App Lock", Settings.ACTION_ACCESSIBILITY_SETTINGS);
+        else showUnavail();
     }
 
-    // ======== 1. Bubble Level ========
-
+    // === LEVEL ===
     private void buildLevel() {
-        titleText.setText("\u6c34\u5e73\u4eea");
-        final SensorManager sm = (SensorManager) getSystemService(SENSOR_SERVICE);
-        final LevelView levelView = new LevelView(this);
-        contentArea.addView(levelView, new LinearLayout.LayoutParams(-1, 500));
-
-        final SensorEventListener listener = new SensorEventListener() {
-            @Override public void onSensorChanged(SensorEvent event) {
-                if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-                    levelView.setTilt(event.values[0], event.values[1]);
-                }
-            }
-            @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+        titleText.setText("水平仪");
+        SensorManager sm = (SensorManager) getSystemService(SENSOR_SERVICE);
+        LevelView lv = new LevelView(this);
+        contentArea.addView(lv, new LinearLayout.LayoutParams(-1, 500));
+        SensorEventListener listener = new SensorEventListener() {
+            @Override public void onSensorChanged(SensorEvent e) { if (e.sensor.getType() == Sensor.TYPE_ACCELEROMETER) lv.setTilt(e.values[0], e.values[1]); }
+            @Override public void onAccuracyChanged(Sensor s, int a) {}
         };
-
         Sensor accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         if (accel != null) sm.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME);
-
-        contentArea.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override public void onViewAttachedToWindow(View v) {}
-            @Override public void onViewDetachedFromWindow(View v) { sm.unregisterListener(listener); }
-        });
-
-        addInfo("\u5c06\u624b\u673a\u5e73\u653e\uff0c\u6c14\u6ce1\u4f1a\u5c45\u4e2d\u8868\u793a\u6c34\u5e73\u3002");
+        addInfo("将手机平放，气泡居中表示水平");
     }
 
-    private static class LevelView extends View {
-        private float xTilt, yTilt;
-        private final Paint bgPaint, circlePaint, bubblePaint, linePaint;
-
-        public LevelView(Context context) {
-            super(context);
-            bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bgPaint.setColor(0x20FFFFFF);
-            circlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            circlePaint.setColor(0x40FFFFFF);
-            circlePaint.setStyle(Paint.Style.STROKE);
-            circlePaint.setStrokeWidth(2);
-            bubblePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bubblePaint.setColor(0xCCFFFFFF);
-            linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            linePaint.setColor(0x30FFFFFF);
-            linePaint.setStrokeWidth(1);
+    static class LevelView extends View {
+        float xTilt, yTilt; Paint bg, circ, bub, ln;
+        LevelView(Context c) {
+            super(c);
+            bg = mkP(0x20FFFFFF); circ = mkP(0x40FFFFFF); bub = mkP(0xCCFFFFFF); ln = mkP(0x30FFFFFF);
+            circ.setStyle(Paint.Style.STROKE); circ.setStrokeWidth(2); ln.setStrokeWidth(1);
         }
-
-        public void setTilt(float x, float y) {
-            xTilt = -x;
-            yTilt = y;
-            postInvalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            float r = Math.min(cx, cy) - 20;
-            canvas.drawCircle(cx, cy, r, bgPaint);
-            canvas.drawCircle(cx, cy, r, circlePaint);
-            canvas.drawLine(cx - r, cy, cx + r, cy, linePaint);
-            canvas.drawLine(cx, cy - r, cx, cy + r, linePaint);
-            canvas.drawCircle(cx, cy, r * 0.5f, circlePaint);
-
-            float bx = cx + (xTilt / 12f) * r * 0.7f;
-            float by = cy + (yTilt / 12f) * r * 0.7f;
-            float dist = (float) Math.sqrt((bx-cx)*(bx-cx) + (by-cy)*(by-cy));
-            float maxDist = r * 0.7f;
-            if (dist > maxDist) {
-                bx = cx + (bx-cx)*maxDist/dist;
-                by = cy + (by-cy)*maxDist/dist;
-            }
-            canvas.drawCircle(bx, by, r*0.15f, bubblePaint);
+        void setTilt(float x, float y) { xTilt = -x; yTilt = y; postInvalidate(); }
+        @Override protected void onDraw(Canvas cv) {
+            float cx = getWidth()/2f, cy = getHeight()/2f, r = Math.min(cx,cy)-20;
+            cv.drawCircle(cx,cy,r,bg); cv.drawCircle(cx,cy,r,circ);
+            cv.drawLine(cx-r,cy,cx+r,cy,ln); cv.drawLine(cx,cy-r,cx,cy+r,ln);
+            cv.drawCircle(cx,cy,r*0.5f,circ);
+            float bx = cx+(xTilt/12f)*r*0.7f, by = cy+(yTilt/12f)*r*0.7f, md = r*0.7f;
+            float dist = (float)Math.sqrt((bx-cx)*(bx-cx)+(by-cy)*(by-cy));
+            if (dist>md) { bx = cx+(bx-cx)*md/dist; by = cy+(by-cy)*md/dist; }
+            cv.drawCircle(bx,by,r*0.15f,bub);
         }
     }
 
-    // ======== 2. Ruler ========
-
+    // === RULER ===
     private void buildRuler() {
-        titleText.setText("\u5c3a\u5b50");
-        final float density = getResources().getDisplayMetrics().density;
-
-        final RulerView ruler = new RulerView(this, density);
-        contentArea.addView(ruler, new LinearLayout.LayoutParams(-1, 200));
-
-        final TextView info = new TextView(this);
-        info.setTextColor(0xB0FFFFFF);
-        info.setTextSize(14);
-        info.setGravity(Gravity.CENTER);
-        info.setPadding(0, 16, 0, 0);
-        info.setText("\u8bf7\u6ed1\u52a8\u5c4f\u5e55");
+        titleText.setText("尺子");
+        float d = getResources().getDisplayMetrics().density;
+        RulerView rv = new RulerView(this, d);
+        contentArea.addView(rv, new LinearLayout.LayoutParams(-1, 200));
+        TextView info = new TextView(this);
+        info.setTextColor(0xB0FFFFFF); info.setTextSize(14); info.setGravity(Gravity.CENTER);
+        info.setPadding(0,16,0,0); info.setText("请滑动屏幕");
         contentArea.addView(info);
-
-        ruler.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                float cm = event.getX() / density / (25.4f / 160f);
-                if (cm < 0) cm = 0;
-                if (cm > 15) cm = 15;
-                info.setText(String.format("%.1f cm", cm));
-                return true;
+        rv.setOnTouchListener(new View.OnTouchListener() {
+            @Override public boolean onTouch(View v, MotionEvent e) {
+                float cm = e.getX()/d/(25.4f/160f);
+                if (cm<0) cm=0; if (cm>15) cm=15;
+                info.setText(String.format("%.1f cm",cm)); return true;
             }
         });
-
-        addInfo("\u6ed1\u52a8\u5c4f\u5e55\u6d4b\u91cf\u957f\u5ea6\uff08\u6700\u591a15cm\uff09");
+        addInfo("滑动屏幕测量（最多15cm）");
     }
 
-    private static class RulerView extends View {
-        private final float density;
-        private final Paint linePaint, textPaint, markPaint;
-
-        public RulerView(Context context, float density) {
-            super(context);
-            this.density = density;
-            linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            linePaint.setColor(0x60FFFFFF);
-            linePaint.setStrokeWidth(1);
-            textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            textPaint.setColor(0xB0FFFFFF);
-            textPaint.setTextSize(28);
-            markPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            markPaint.setColor(0xCCFFFFFF);
-            markPaint.setStrokeWidth(3);
+    static class RulerView extends View {
+        float d; Paint lp, tp, mp;
+        RulerView(Context c, float density) {
+            super(c); d = density; lp = mkP(0x60FFFFFF); tp = mkP(0xB0FFFFFF); mp = mkP(0xCCFFFFFF);
+            lp.setStrokeWidth(1); mp.setStrokeWidth(3); tp.setTextSize(28);
         }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float pxPerCm = density * (25.4f / 160f);
-            float w = getWidth();
-            int h = getHeight();
-
-            Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bg.setColor(0x20FFFFFF);
-            canvas.drawRect(0, 20, w, h-20, bg);
-            bg.setColor(0x40FFFFFF);
-            bg.setStyle(Paint.Style.STROKE);
-            bg.setStrokeWidth(1);
-            canvas.drawRect(0, 20, w, h-20, bg);
-
-            for (int cm = 0; cm <= 15; cm++) {
-                float x = cm * pxPerCm;
-                if (x > w) break;
-                canvas.drawLine(x, 20, x, h-20, markPaint);
-                canvas.drawText(cm + "cm", x+4, h-28, textPaint);
-                if (cm < 15) {
-                    for (int mm = 1; mm < 10; mm++) {
-                        float mx = x + mm * pxPerCm / 10;
-                        float mh = (mm == 5) ? (h-20)*0.6f : (h-20)*0.4f;
-                        canvas.drawLine(mx, h-20, mx, h-20-mh, linePaint);
-                    }
+        @Override protected void onDraw(Canvas cv) {
+            float px = d*(25.4f/160f), w = getWidth(); int h = getHeight();
+            Paint bkg = mkP(0x20FFFFFF); cv.drawRect(0,20,w,h-20,bkg);
+            bkg = mkP(0x40FFFFFF); bkg.setStyle(Paint.Style.STROKE); bkg.setStrokeWidth(1);
+            cv.drawRect(0,20,w,h-20,bkg);
+            for (int cm=0; cm<=15; cm++) {
+                float x = cm*px; if(x>w) break;
+                cv.drawLine(x,20,x,h-20,mp); cv.drawText(cm+"cm",x+4,h-28,tp);
+                if (cm<15) for (int mm=1;mm<10;mm++) {
+                    float mx = x+mm*px/10, mh = mm==5 ? (h-20)*0.6f : (h-20)*0.4f;
+                    cv.drawLine(mx,h-20,mx,h-20-mh,lp);
                 }
             }
         }
     }
 
-    // ======== 3. Unit Converter ========
-
+    // === CONVERTER ===
     private void buildConverter() {
-        titleText.setText("\u5355\u4f4d\u6362\u7b97");
-        final String[] cats = {"\u957f\u5ea6", "\u91cd\u91cf", "\u6e29\u5ea6"};
-        final String[][] units = {
-            {"cm", "m", "km", "in", "ft"},
-            {"g", "kg", "lb", "oz"},
-            {"\u00b0C", "\u00b0F", "K"}
-        };
-        final double[][] rates = {
-            {0.01, 1, 1000, 0.0254, 0.3048},
-            {1, 1000, 453.592, 28.3495},
-            {1, 0.5556, 1}
-        };
-
-        catRow = new LinearLayout(this);
-        catRow.setOrientation(LinearLayout.HORIZONTAL);
-        catRow.setGravity(Gravity.CENTER);
-
-        for (int c = 0; c < cats.length; c++) {
+        titleText.setText("单位换算");
+        String[] cats = {"长度","重量","温度"};
+        String[][] units = {{"cm","m","km","in","ft"},{"g","kg","lb","oz"},{"\u00b0C","\u00b0F","K"}};
+        double[][] rates = {{0.01,1,1000,0.0254,0.3048},{1,1000,453.592,28.3495},{1,0.5556,1}};
+        LinearLayout cr = new LinearLayout(this);
+        cr.setOrientation(LinearLayout.HORIZONTAL); cr.setGravity(Gravity.CENTER);
+        for (int c=0; c<cats.length; c++) {
             final int ci = c;
-            Button btn = new Button(this, null, android.R.attr.buttonStyleSmall);
-            btn.setText(cats[c]);
-            btn.setTextColor(0xFFFFFFFF);
-            btn.setTextSize(13);
-            btn.setBackgroundResource(R.drawable.glass_top_bar);
-            btn.setPadding(16, 8, 16, 8);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, 44);
-            lp.setMargins(4, 4, 4, 4);
-            btn.setLayoutParams(lp);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    rebuildConverter(ci, units, rates);
+            Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+            b.setText(cats[c]); b.setTextColor(0xFFFFFFFF); b.setTextSize(13);
+            b.setBackgroundResource(R.drawable.glass_top_bar); b.setPadding(16,8,16,8);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2,44);
+            lp.setMargins(4,4,4,4); b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { convRows(ci, units, rates); }
+            });
+            cr.addView(b);
+        }
+        contentArea.addView(cr);
+        convRows(0, units, rates);
+        addInfo("输入数值自动换算");
+    }
+
+    private void convRows(int cat, String[][] units, double[][] rates) {
+        String[] u = units[cat]; double[] r = rates[cat]; boolean isTemp = (cat==2);
+        for (int i=contentArea.getChildCount()-1; i>=0; i--) {
+            View cv = contentArea.getChildAt(i);
+            if (cv instanceof LinearLayout && cv != contentArea.getChildAt(0)) contentArea.removeViewAt(i);
+        }
+        for (int i=0; i<u.length; i++) {
+            final int fi = i;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackgroundResource(R.drawable.glass_top_bar); row.setPadding(8,6,8,6);
+            final EditText et = new EditText(this);
+            et.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            et.setTextColor(0xFFFFFFFF); et.setHintTextColor(0x80FFFFFF); et.setHint("0");
+            et.setTextSize(16); et.setBackgroundColor(0x15FFFFFF); et.setPadding(12,8,12,8);
+            et.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+            TextView label = new TextView(this);
+            label.setText(u[i]); label.setTextColor(0xB0FFFFFF); label.setTextSize(14); label.setPadding(12,0,0,0);
+            et.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+                @Override public void onFocusChange(View v, boolean hf) {
+                    if (!hf) return;
+                    String s = et.getText().toString();
+                    if (s.isEmpty()) return;
+                    try {
+                        double val = Double.parseDouble(s); int idx = 0;
+                        for (int j=0; j<contentArea.getChildCount(); j++) {
+                            View cv = contentArea.getChildAt(j);
+                            if (!(cv instanceof LinearLayout) || cv==contentArea.getChildAt(0)) continue;
+                            if (idx==fi) { idx++; continue; }
+                            double conv;
+                            if (isTemp) { double c = (fi==0)?val:(fi==1)?(val-32)*5/9:val-273.15; conv = (idx==0)?c:(idx==1)?c*9/5+32:c+273.15; }
+                            else { double base = val*(r[0]/r[fi]); conv = base/(r[0]/r[idx]); }
+                            ((EditText)((LinearLayout)cv).getChildAt(0)).setText(String.format("%.4f", conv));
+                            idx++;
+                        }
+                    } catch (NumberFormatException e) {}
                 }
             });
-            catRow.addView(btn);
+            row.addView(et); row.addView(label); contentArea.addView(row);
         }
-        contentArea.addView(catRow);
-        rebuildConverter(0, units, rates);
-        addInfo("\u9009\u62e9\u7c7b\u522b\uff0c\u8f93\u5165\u6570\u503c\u81ea\u52a8\u6362\u7b97");
     }
 
-    private void rebuildConverter(int cat, String[][] units, double[][] rates) {
-        final String[] unitList = units[cat];
-        final double[] rateList = rates[cat];
-        final boolean isTemp = (cat == 2);
-
-        // Remove old rows
-        int childCount = contentArea.getChildCount();
-        for (int i = childCount - 1; i >= 0; i--) {
-            View child = contentArea.getChildAt(i);
-            if (child instanceof LinearLayout && child != contentArea.getChildAt(0)) {
-                contentArea.removeViewAt(i);
+    // === COUNTDOWN ===
+    private void buildCountdown() {
+        titleText.setText("倒计时");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        Calendar today = Calendar.getInstance();
+        TextView dd = new TextView(this);
+        dd.setText(sdf.format(today.getTime())); dd.setTextColor(0xFFFFFFFF); dd.setTextSize(24);
+        dd.setGravity(Gravity.CENTER); dd.setPadding(0,20,0,10);
+        dd.setBackgroundResource(R.drawable.glass_top_bar); contentArea.addView(dd);
+        String[] ps = {"今天","明天","7天后","1个月"};
+        for (String p : ps) {
+            final String fp = p;
+            Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+            b.setText(p); b.setTextColor(0xFFFFFFFF); b.setTextSize(12);
+            b.setBackgroundResource(R.drawable.glass_top_bar); b.setPadding(12,6,12,6);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2,40);
+            lp.setMargins(3,3,3,3); b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    Calendar c = (Calendar)today.clone();
+                    if (fp.equals("明天")) c.add(Calendar.DAY_OF_YEAR, 1);
+                    else if (fp.equals("7天后")) c.add(Calendar.DAY_OF_YEAR, 7);
+                    else if (fp.equals("1个月")) c.add(Calendar.MONTH, 1);
+                    dd.setText(sdf.format(c.getTime()));
+                    cdResult(today, c);
+                }
+            });
+            contentArea.addView(b);
+        }
+    }
+    private void cdResult(Calendar from, Calendar to) {
+        long ms = to.getTimeInMillis() - from.getTimeInMillis();
+        String prefix = ms < 0 ? "Passed: " : "Remaining: ";
+        long d = Math.abs(ms)/(1000*60*60*24), h = (Math.abs(ms)%(1000*60*60*24))/(1000*60*60);
+        for (int i=contentArea.getChildCount()-1; i>=0; i--) {
+            View v = contentArea.getChildAt(i);
+            if (v instanceof TextView && ((TextView)v).getCurrentTextColor() == 0xFFFFFFFF) {
+                ((TextView)v).setText(prefix + d + "d " + h + "h"); ((TextView)v).setTextSize(20); break;
             }
         }
+    }
 
-        final ToolsActivity self = this;
-        for (int i = 0; i < unitList.length; i++) {
+    // === WHITE NOISE ===
+    private void buildWhiteNoise() {
+        titleText.setText("White Noise");
+        String[] ns = {"Waves","Rain","Wind","Nature","White"};
+        String[] icons = {"~~","**","~~","oo","##"};
+        for (int i=0; i<ns.length; i++) {
             final int fi = i;
+            Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+            b.setText(icons[i] + " " + ns[i]); b.setTextColor(0xFFFFFFFF); b.setTextSize(16);
+            b.setGravity(Gravity.CENTER); b.setPadding(20,16,20,16);
+            b.setBackgroundResource(R.drawable.glass_card);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,56);
+            lp.setMargins(0,6,0,6); b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { Toast.makeText(ToolsActivity.this, "Playing: " + ns[fi], 0).show(); }
+            });
+            contentArea.addView(b);
+        }
+        addInfo("Tap to play (demo - no audio files bundled)");
+    }
+
+    // === CPU MONITOR ===
+    private void buildCpuMonitor() {
+        titleText.setText("CPU Monitor");
+        final TextView cpuText = new TextView(this);
+        cpuText.setTextColor(0xFFFFFFFF); cpuText.setTextSize(32);
+        cpuText.setGravity(Gravity.CENTER); cpuText.setPadding(0,30,0,10);
+        contentArea.addView(cpuText);
+        TextView info = new TextView(this);
+        info.setTextColor(0xB0FFFFFF); info.setTextSize(14); info.setGravity(Gravity.CENTER);
+        info.setText("Cores: " + Runtime.getRuntime().availableProcessors());
+        contentArea.addView(info);
+        final Runnable updater = new Runnable() {
+            long prevIdle=0, prevTotal=0;
+            @Override public void run() {
+                try {
+                    BufferedReader br = new BufferedReader(new FileReader("/proc/stat"));
+                    String line = br.readLine(); br.close();
+                    if (line != null && line.startsWith("cpu ")) {
+                        String[] p = line.split("\\s+");
+                        long idle = Long.parseLong(p[4]), total = 0;
+                        for (int i=1; i<p.length; i++) total += Long.parseLong(p[i]);
+                        if (prevTotal > 0) {
+                            int pct = (int)((1.0 - (double)(idle-prevIdle)/(total-prevTotal)) * 100);
+                            cpuText.setText(pct + "%");
+                        }
+                        prevIdle = idle; prevTotal = total;
+                    }
+                } catch (Exception e) { cpuText.setText("N/A"); }
+                cpuText.postDelayed(this, 2000);
+            }
+        };
+        updater.run();
+        addInfo("No permissions needed");
+    }
+
+    // === NETWORK MONITOR ===
+    private void buildNetworkMonitor() {
+        titleText.setText("Network Speed");
+        final TextView txText = new TextView(this);
+        txText.setTextColor(0xFFFFFFFF); txText.setTextSize(18);
+        txText.setGravity(Gravity.CENTER); txText.setPadding(0,30,0,10);
+        contentArea.addView(txText);
+        final TextView rxText = new TextView(this);
+        rxText.setTextColor(0xB0FFFFFF); rxText.setTextSize(18);
+        rxText.setGravity(Gravity.CENTER);
+        contentArea.addView(rxText);
+        final Runnable updater = new Runnable() {
+            long prevTx = TrafficStats.getTotalTxBytes();
+            long prevRx = TrafficStats.getTotalRxBytes();
+            @Override public void run() {
+                long tx = TrafficStats.getTotalTxBytes();
+                long rx = TrafficStats.getTotalRxBytes();
+                txText.setText("Upload: " + (tx-prevTx)/1024 + " KB/s");
+                rxText.setText("Download: " + (rx-prevRx)/1024 + " KB/s");
+                prevTx = tx; prevRx = rx;
+                txText.postDelayed(this, 1000);
+            }
+        };
+        updater.run();
+        addInfo("No permissions needed");
+    }
+
+    // === CLEANER ===
+    private void buildCleaner() {
+        titleText.setText("Storage Info");
+        StatFs stat = new StatFs(Environment.getDataDirectory().getPath());
+        long total = (long)stat.getTotalBytes();
+        long free = (long)stat.getAvailableBytes();
+        long used = total - free;
+        TextView t = new TextView(this);
+        t.setTextColor(0xFFFFFFFF); t.setTextSize(22);
+        t.setGravity(Gravity.CENTER); t.setPadding(0,30,0,5);
+        t.setText(Formatter.formatFileSize(this, total));
+        contentArea.addView(t);
+        TextView d = new TextView(this);
+        d.setTextColor(0xB0FFFFFF); d.setTextSize(14);
+        d.setGravity(Gravity.CENTER);
+        d.setText("Used: " + Formatter.formatFileSize(this, used) + " / Free: " + Formatter.formatFileSize(this, free));
+        contentArea.addView(d);
+        addInfo("No permissions needed");
+    }
+
+    // === PRIVATE ALBUM ===
+    private void buildPrivateAlbum() {
+        titleText.setText("Private Album");
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES}, PERMISSION_REQUEST);
+                permGate("READ_MEDIA_IMAGES"); return;
+            }
+        } else {
+            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);
+                permGate("READ_EXTERNAL_STORAGE"); return;
+            }
+        }
+        albumContent();
+    }
+    private void permGate(String perm) {
+        TextView tv = new TextView(this);
+        tv.setTextColor(0xFFFFFFFF); tv.setTextSize(16);
+        tv.setGravity(Gravity.CENTER); tv.setPadding(0,60,0,20);
+        tv.setText("Need: " + perm); contentArea.addView(tv);
+        Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+        b.setText("Grant"); b.setTextColor(0xFFFFFFFF); b.setBackgroundResource(R.drawable.glass_card);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (Build.VERSION.SDK_INT >= 33)
+                    requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES}, PERMISSION_REQUEST);
+                else
+                    requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);
+            }
+        });
+        contentArea.addView(b);
+    }
+    private void albumContent() {
+        try {
+            Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                new String[]{MediaStore.Images.Media._ID}, null, null, null);
+            int count = cursor != null ? cursor.getCount() : 0;
+            if (cursor != null) cursor.close();
+            TextView tv = new TextView(this);
+            tv.setTextColor(0xFFFFFFFF); tv.setTextSize(24);
+            tv.setGravity(Gravity.CENTER); tv.setPadding(0,60,0,10);
+            tv.setText(count + " photos"); contentArea.addView(tv);
+        } catch (Exception e) { permGate("Storage"); }
+    }
+
+    // === WIFI ANALYZER ===
+    private void buildWifiAnalyzer() {
+        titleText.setText("WiFi Analyzer");
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_REQUEST);
+            permGate("ACCESS_FINE_LOCATION"); return;
+        }
+        scanWifi();
+    }
+    private void scanWifi() {
+        WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        if (wm == null) { addInfo("WiFi N/A"); return; }
+        wm.startScan();
+        List<ScanResult> results = wm.getScanResults();
+        if (results == null || results.isEmpty()) {
+            addInfo("No networks found. Press back and try again.");
+            return;
+        }
+        Collections.sort(results, (a,b) -> b.level - a.level);
+        int max = Math.min(results.size(), 10);
+        for (int i=0; i<max; i++) {
+            ScanResult r = results.get(i);
+            int sig = Math.min(100, Math.max(0, (r.level+100)*2));
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, 4, 0, 4);
             row.setBackgroundResource(R.drawable.glass_top_bar);
-            row.setPadding(8, 6, 8, 6);
+            row.setPadding(12,8,12,8);
+            TextView name = new TextView(this);
+            name.setText(r.SSID.isEmpty() ? "(hidden)" : r.SSID);
+            name.setTextColor(0xFFFFFFFF); name.setTextSize(14);
+            name.setLayoutParams(new LinearLayout.LayoutParams(0,-2,1));
+            TextView st = new TextView(this);
+            st.setText(sig + "%"); st.setTextSize(13);
+            st.setTextColor(sig>60 ? 0xFFA5D6A7 : sig>30 ? 0xFFFFCC80 : 0xFFEF9A9A);
+            row.addView(name); row.addView(st); contentArea.addView(row);
+        }
+        addInfo("Found " + results.size() + " networks");
+    }
 
-            final EditText et = new EditText(this);
-            et.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-            et.setTextColor(0xFFFFFFFF);
-            et.setHintTextColor(0x80FFFFFF);
-            et.setHint("0");
-            et.setTextSize(16);
-            et.setBackgroundColor(0x15FFFFFF);
-            et.setPadding(12, 8, 12, 8);
-            et.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1));
-
-            TextView label = new TextView(this);
-            label.setText(unitList[i]);
-            label.setTextColor(0xB0FFFFFF);
-            label.setTextSize(14);
-            label.setPadding(12, 0, 0, 0);
-
-            final EditText[] inputs = new EditText[unitList.length];
-            inputs[i] = et;
-            // Store for later: iterate to find all inputs - simplification
-            et.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (!hasFocus) return;
-                    String str = et.getText().toString();
-                    if (str.isEmpty()) return;
-                    try {
-                        double val = Double.parseDouble(str);
-                        // Find all sibling EditTexts
-                        LinearLayout parent = (LinearLayout) et.getParent();
-                        if (parent == null) return;
-                        // Scan all rows for edit texts
-                        final double finalVal = val;
-                        final int fromIdx = fi;
-                        for (int j = 0; j < contentArea.getChildCount(); j++) {
-                            View cv = contentArea.getChildAt(j);
-                            if (cv instanceof LinearLayout && cv != catRow) {
-                                LinearLayout row2 = (LinearLayout) cv;
-                                View first = row2.getChildAt(0);
-                                if (first instanceof EditText) {
-                                    String hint = ((EditText)first).getHint().toString();
-                                    if (hint.equals("0")) {
-                                        String txt = ((EditText)first).getText().toString();
-                                        if (!txt.isEmpty() && !txt.equals(et.getText().toString())) {
-                                            continue;
-                                        }
-                                        double converted;
-                                        if (isTemp) {
-                                            converted = convertTemp(finalVal, fromIdx, j);
-                                        } else {
-                                            double base = finalVal * (rateList[0] / rateList[fromIdx]);
-                                            converted = base / (rateList[0] / rateList[j % unitList.length]);
-                                        }
-                                        if (j % unitList.length < unitList.length) {
-                                            ((EditText)first).setText(String.format("%.4f", converted));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (NumberFormatException e) {
-                        // ignore
-                    }
-                }
-            });
-
-            row.addView(et);
-            row.addView(label);
-            contentArea.addView(row);
+    @Override
+    public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
+        super.onRequestPermissionsResult(code, perms, res);
+        if (code == PERMISSION_REQUEST && res.length>0 && res[0]==0) {
+            Toast.makeText(this, "Permission granted", 0).show();
+            recreate();
         }
     }
 
-    // Keep for reference but converter will handle it inline above
-    private double convertTemp(double val, int from, int to) {
-        double c;
-        if (from == 0) c = val;
-        else if (from == 1) c = (val - 32) * 5 / 9;
-        else c = val - 273.15;
-        if (to == 0) return c;
-        else if (to == 1) return c * 9 / 5 + 32;
-        else return c + 273.15;
-    }
-
-    // ======== 4. Countdown ========
-
-    private void buildCountdown() {
-        titleText.setText("\u5012\u8ba1\u65f6");
-        final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        final Calendar today = Calendar.getInstance();
-
-        final TextView dateDisplay = new TextView(this);
-        dateDisplay.setText(sdf.format(today.getTime()));
-        dateDisplay.setTextColor(0xFFFFFFFF);
-        dateDisplay.setTextSize(24);
-        dateDisplay.setGravity(Gravity.CENTER);
-        dateDisplay.setPadding(0, 20, 0, 10);
-        dateDisplay.setBackgroundResource(R.drawable.glass_top_bar);
-        contentArea.addView(dateDisplay);
-
-        String[] presets = {"\u4eca\u5929", "\u660e\u5929", "7\u5929\u540e", "1\u4e2a\u6708"};
-        for (final String preset : presets) {
-            Button btn = new Button(this, null, android.R.attr.buttonStyleSmall);
-            btn.setText(preset);
-            btn.setTextColor(0xFFFFFFFF);
-            btn.setTextSize(12);
-            btn.setBackgroundResource(R.drawable.glass_top_bar);
-            btn.setPadding(12, 6, 12, 6);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, 40);
-            lp.setMargins(3, 3, 3, 3);
-            btn.setLayoutParams(lp);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    Calendar c = (Calendar) today.clone();
-                    if ("\u660e\u5929".equals(preset)) c.add(Calendar.DAY_OF_YEAR, 1);
-                    else if ("7\u5929\u540e".equals(preset)) c.add(Calendar.DAY_OF_YEAR, 7);
-                    else if ("1\u4e2a\u6708".equals(preset)) c.add(Calendar.MONTH, 1);
-                    dateDisplay.setText(sdf.format(c.getTime()));
-                    showCountdownResult(today, c);
-                }
-            });
-            contentArea.addView(btn);
-        }
-
-        // Manual input
-        LinearLayout manualRow = new LinearLayout(this);
-        manualRow.setOrientation(LinearLayout.HORIZONTAL);
-        manualRow.setPadding(0, 12, 0, 0);
-
-        final EditText dateInput = new EditText(this);
-        dateInput.setHint("yyyy-MM-dd");
-        dateInput.setHintTextColor(0x80FFFFFF);
-        dateInput.setTextColor(0xFFFFFFFF);
-        dateInput.setTextSize(14);
-        dateInput.setBackgroundColor(0x15FFFFFF);
-        dateInput.setPadding(12, 8, 12, 8);
-        dateInput.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1));
-
-        Button goBtn = new Button(this, null, android.R.attr.buttonStyleSmall);
-        goBtn.setText("OK");
-        goBtn.setTextColor(0xFFFFFFFF);
-        goBtn.setBackgroundResource(R.drawable.glass_top_bar);
-        goBtn.setPadding(16, 8, 16, 8);
-        goBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                try {
-                    Date d = sdf.parse(dateInput.getText().toString());
-                    Calendar c = Calendar.getInstance();
-                    c.setTime(d);
-                    dateDisplay.setText(sdf.format(c.getTime()));
-                    showCountdownResult(today, c);
-                } catch (Exception e) {
-                    Toast.makeText(ToolsActivity.this, "Format: yyyy-MM-dd", Toast.LENGTH_SHORT).show();
-                }
-            }
+    private void showSysPerm(String name, String action) {
+        titleText.setText(name);
+        TextView tv = new TextView(this);
+        tv.setTextColor(0xFFFFFFFF); tv.setTextSize(16);
+        tv.setGravity(Gravity.CENTER); tv.setPadding(0,60,0,20);
+        tv.setText("Needs system permission"); contentArea.addView(tv);
+        Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+        b.setText("Open Settings"); b.setTextColor(0xFFFFFFFF);
+        b.setBackgroundResource(R.drawable.glass_card);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { startActivity(new Intent(action)); }
         });
-
-        manualRow.addView(dateInput);
-        manualRow.addView(goBtn);
-        contentArea.addView(manualRow);
-
-        showCountdownResult(today, today);
+        contentArea.addView(b);
     }
 
-    private void showCountdownResult(Calendar from, Calendar to) {
-        long diffMs = to.getTimeInMillis() - from.getTimeInMillis();
-        String prefix = (diffMs < 0) ? "Passed: " : "Remaining: ";
-        String result = prefix + formatDuration(Math.abs(diffMs));
-
-        for (int i = contentArea.getChildCount() - 1; i >= 0; i--) {
-            View v = contentArea.getChildAt(i);
-            if (v instanceof TextView && ((TextView)v).getGravity() == Gravity.CENTER) {
-                if (((TextView)v).getCurrentTextColor() == 0xFFFFFFFF) {
-                    ((TextView)v).setText(result);
-                    ((TextView)v).setTextSize(20);
-                    break;
-                }
-            }
-        }
-    }
-
-    private String formatDuration(long ms) {
-        long days = ms / (1000*60*60*24);
-        long hours = (ms % (1000*60*60*24)) / (1000*60*60);
-        long mins = (ms % (1000*60*60)) / (1000*60);
-        return days + "d " + hours + "h " + mins + "m";
-    }
-
-    // ======== 5. White Noise ========
-
-    private void buildWhiteNoise() {
-        titleText.setText("White Noise");
-        String[] noises = {"[~] Waves", "[*] Rain", "[~] Wind", "[o] Nature", "[#] White"};
-
-        for (int i = 0; i < noises.length; i++) {
-            final int fi = i;
-            Button btn = new Button(this, null, android.R.attr.buttonStyleSmall);
-            btn.setText(noises[i]);
-            btn.setTextColor(0xFFFFFFFF);
-            btn.setTextSize(16);
-            btn.setGravity(Gravity.CENTER);
-            btn.setPadding(20, 16, 20, 16);
-            btn.setBackgroundResource(R.drawable.glass_card);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 56);
-            lp.setMargins(0, 6, 0, 6);
-            btn.setLayoutParams(lp);
-            btn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    Toast.makeText(ToolsActivity.this, "Playing: " + noises[fi], Toast.LENGTH_SHORT).show();
-                }
-            });
-            contentArea.addView(btn);
-        }
-
-        addInfo("Tap to play ambient sounds");
+    private void showUnavail() {
+        titleText.setText("N/A");
+        TextView tv = new TextView(this);
+        tv.setTextColor(0xFFFFFFFF); tv.setTextSize(16);
+        tv.setGravity(Gravity.CENTER); tv.setPadding(0,60,0,20);
+        tv.setText("Requires external libraries"); contentArea.addView(tv);
     }
 
     private void addInfo(String text) {
         TextView tv = new TextView(this);
-        tv.setText(text);
-        tv.setTextColor(0x80FFFFFF);
-        tv.setTextSize(12);
-        tv.setGravity(Gravity.CENTER);
-        tv.setPadding(0, 20, 0, 0);
-        contentArea.addView(tv);
+        tv.setTextColor(0x80FFFFFF); tv.setTextSize(12);
+        tv.setGravity(Gravity.CENTER); tv.setPadding(0,20,0,0);
+        tv.setText(text); contentArea.addView(tv);
+    }
+
+    private static Paint mkP(int c) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); p.setColor(c); return p;
     }
 }
