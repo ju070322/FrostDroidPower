@@ -10,7 +10,7 @@
     android:paddingRight="20dp"
     android:background="@drawable/gradient_bg">
 
-    <!-- 设备管理员状态栏 -->
+    <!-- 设备管理员状态栏（仅电源页显示） -->
     <LinearLayout
         android:id="@+id/adminStatusBar"
         android:layout_width="match_parent"
@@ -34,172 +34,247 @@
 
     <View
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="0.3" />
+        android:layout_height="8dp" />
 
-    <!-- 正中主卡片 -->
+    <!-- 标签切换栏 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
         android:gravity="center"
-        android:orientation="vertical"
-        android:background="@drawable/glass_card"
-        android:paddingTop="40dp"
-        android:paddingBottom="32dp"
-        android:paddingLeft="20dp"
-        android:paddingRight="20dp">
+        android:orientation="horizontal"
+        android:background="@drawable/glass_top_bar"
+        android:padding="4dp">
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/title"
-            android:textColor="#FFFFFF"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/subtitle"
-            android:textColor="#90FFFFFF"
-            android:textSize="12sp"
-            android:letterSpacing="0.15" />
-
-        <TextView
-            android:layout_width="56dp"
-            android:layout_height="56dp"
+            android:id="@+id/tabPower"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:gravity="center"
-            android:text="⏻"
+            android:text="@string/tab_power"
             android:textColor="#FFFFFF"
-            android:textSize="26sp"
-            android:layout_marginTop="24dp"
-            android:background="@drawable/glass_icon_bg" />
-
-        <View
-            android:layout_width="64dp"
-            android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="28dp"
-            android:background="@drawable/glass_divider" />
-
-        <!-- 关机 -->
-        <LinearLayout
-            android:id="@+id/shutdownButton"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:background="@drawable/btn_shutdown"
-            android:paddingLeft="12dp"
-            android:paddingRight="20dp"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:background="@drawable/tab_active"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true" />
 
-            <TextView
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:gravity="center"
-                android:text="⏻"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:background="@drawable/glass_icon_bg" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginLeft="14dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/shutdown"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="@string/shutdown_desc"
-                    android:textColor="#90FFFFFF"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="10dp" />
-
-        <!-- 重启 -->
-        <LinearLayout
-            android:id="@+id/rebootButton"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:background="@drawable/btn_reboot"
-            android:paddingLeft="12dp"
-            android:paddingRight="20dp"
+        <TextView
+            android:id="@+id/tabTools"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/tab_tools"
+            android:textColor="#B0FFFFFF"
+            android:textSize="14sp"
+            android:background="@drawable/tab_inactive"
             android:clickable="true"
-            android:focusable="true">
-
-            <TextView
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:gravity="center"
-                android:text="⟳"
-                android:textColor="#FFFFFF"
-                android:textSize="20sp"
-                android:background="@drawable/glass_icon_bg" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginLeft="14dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/reboot"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="@string/reboot_desc"
-                    android:textColor="#90FFFFFF"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
+            android:focusable="true" />
     </LinearLayout>
 
     <View
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="0.4" />
+        android:layout_weight="0.15" />
 
-    <!-- 底部状态 -->
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textColor="#60FFFFFF"
-        android:textSize="11sp"
-        android:visibility="gone" />
+    <!-- ===== 电源控制页 ===== -->
+    <ScrollView
+        android:id="@+id/powerPage"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-    <!-- 版本号 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:background="@drawable/glass_card"
+                android:paddingTop="36dp"
+                android:paddingBottom="28dp"
+                android:paddingLeft="20dp"
+                android:paddingRight="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/title"
+                    android:textColor="#FFFFFF"
+                    android:textSize="26sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/subtitle"
+                    android:textColor="#90FFFFFF"
+                    android:textSize="12sp"
+                    android:letterSpacing="0.15" />
+
+                <TextView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:gravity="center"
+                    android:text="⏻"
+                    android:textColor="#FFFFFF"
+                    android:textSize="26sp"
+                    android:layout_marginTop="24dp"
+                    android:background="@drawable/glass_icon_bg" />
+
+                <View
+                    android:layout_width="64dp"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="24dp"
+                    android:background="@drawable/glass_divider" />
+
+                <!-- 关机 -->
+                <LinearLayout
+                    android:id="@+id/shutdownButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:background="@drawable/btn_shutdown"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="20dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <TextView
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:gravity="center"
+                        android:text="⏻"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:background="@drawable/glass_icon_bg" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginLeft="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/shutdown"
+                            android:textColor="#FFFFFF"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:text="@string/shutdown_desc"
+                            android:textColor="#90FFFFFF"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp" />
+
+                <!-- 重启 -->
+                <LinearLayout
+                    android:id="@+id/rebootButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:background="@drawable/btn_reboot"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="20dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <TextView
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:gravity="center"
+                        android:text="⟳"
+                        android:textColor="#FFFFFF"
+                        android:textSize="20sp"
+                        android:background="@drawable/glass_icon_bg" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginLeft="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/reboot"
+                            android:textColor="#FFFFFF"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:text="@string/reboot_desc"
+                            android:textColor="#90FFFFFF"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:textColor="#60FFFFFF"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ===== 工具箱页 ===== -->
+    <ScrollView
+        android:id="@+id/toolsPage"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:visibility="gone">
+
+        <GridLayout
+            android:id="@+id/toolsGrid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="3"
+            android:padding="4dp" />
+
+    </ScrollView>
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="0.1" />
+
+    <!-- 底部版本号 -->
     <TextView
+        android:id="@+id/versionText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center"

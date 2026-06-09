@@ -2,7 +2,6 @@ package com.helloapp;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.admin.DeviceAdminReceiver;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -11,7 +10,12 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.GridLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,13 +23,36 @@ public class MainActivity extends Activity {
 
     private static final int REQUEST_CODE_ADMIN = 1001;
 
-    private TextView statusText;
-    private View shutdownButton;
-    private View rebootButton;
-    private View adminStatusBar;
+    private View shutdownButton, rebootButton, adminStatusBar;
+    private TextView statusText, versionText;
+    private TextView tabPower, tabTools;
+    private ScrollView powerPage, toolsPage;
+    private GridLayout toolsGrid;
 
     private DevicePolicyManager dpm;
     private ComponentName adminComponent;
+    private boolean isPowerTab = true;
+
+    // 工具数据
+    private static final String[][] TOOLS = {
+        {"水平仪",      "\uD83D\uDCF0"},
+        {"尺子",        "\uD83D\uDCCF"},
+        {"剪贴板管理",  "\uD83D\uDCCB"},
+        {"悬浮球",      "\uD83D\uDD35"},
+        {"应用锁",      "\uD83D\uDD12"},
+        {"私密相册",    "\uD83D\uDCF8"},
+        {"垃圾清理",    "\uD83D\uDDD1\uFE0F"},
+        {"CPU监控",     "\u2699\uFE0F"},
+        {"WiFi分析仪",  "\uD83D\uDCF6"},
+        {"单位换算",    "\uD83D\uDCCA"},
+        {"倒计时/纪念日","\u23F3"},
+        {"白噪音",      "\uD83C\uDFB5"},
+        {"GIF制作",     "\uD83C\uDFAC"},
+        {"OCR识别",     "\uD83D\uDD0D"},
+        {"铃声制作",    "\uD83D\uDD14"},
+        {"拼图工具",    "\uD83D\uDDBC\uFE0F"},
+        {"手机换机",    "\uD83D\uDCE1"},
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,12 +62,60 @@ public class MainActivity extends Activity {
         dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
         adminComponent = new ComponentName(this, PowerAdminReceiver.class);
 
-        statusText = findViewById(R.id.statusText);
+        initViews();
+        setupTabs();
+        setupPowerButtons();
+        buildToolsGrid();
+        updateAdminStatus();
+    }
+
+    private void initViews() {
+        adminStatusBar = findViewById(R.id.adminStatusBar);
+        tabPower = findViewById(R.id.tabPower);
+        tabTools = findViewById(R.id.tabTools);
+        powerPage = findViewById(R.id.powerPage);
+        toolsPage = findViewById(R.id.toolsPage);
+        toolsGrid = findViewById(R.id.toolsGrid);
         shutdownButton = findViewById(R.id.shutdownButton);
         rebootButton = findViewById(R.id.rebootButton);
-        adminStatusBar = findViewById(R.id.adminStatusBar);
+        statusText = findViewById(R.id.statusText);
+        versionText = findViewById(R.id.versionText);
+    }
 
-        // 点击设备管理员状态栏可激活
+    // ======== Tab 切换 ========
+
+    private void setupTabs() {
+        tabPower.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchTab(true);
+            }
+        });
+        tabTools.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                switchTab(false);
+            }
+        });
+    }
+
+    private void switchTab(boolean toPower) {
+        isPowerTab = toPower;
+        powerPage.setVisibility(toPower ? View.VISIBLE : View.GONE);
+        toolsPage.setVisibility(toPower ? View.GONE : View.VISIBLE);
+        adminStatusBar.setVisibility(toPower ? View.VISIBLE : View.GONE);
+
+        tabPower.setBackgroundResource(toPower ? R.drawable.tab_active : R.drawable.tab_inactive);
+        tabPower.setTextColor(toPower ? 0xFFFFFFFF : 0xB0FFFFFF);
+        tabTools.setBackgroundResource(toPower ? R.drawable.tab_inactive : R.drawable.tab_active);
+        tabTools.setTextColor(toPower ? 0xB0FFFFFF : 0xFFFFFFFF);
+
+        if (toPower) updateAdminStatus();
+    }
+
+    // ======== 电源控制 ========
+
+    private void setupPowerButtons() {
         if (adminStatusBar != null) {
             adminStatusBar.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -53,7 +128,7 @@ public class MainActivity extends Activity {
         shutdownButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showConfirmDialog("关机", "确定要关闭设备吗？", new Runnable() {
+                showConfirm("关机", "确定要关闭设备吗？", new Runnable() {
                     @Override
                     public void run() {
                         doShutdown();
@@ -65,7 +140,7 @@ public class MainActivity extends Activity {
         rebootButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showConfirmDialog("重启", "确定要重新启动设备吗？", new Runnable() {
+                showConfirm("重启", "确定要重新启动设备吗？", new Runnable() {
                     @Override
                     public void run() {
                         doReboot();
@@ -87,21 +162,21 @@ public class MainActivity extends Activity {
         if (requestCode == REQUEST_CODE_ADMIN) {
             updateAdminStatus();
             if (isAdminActive()) {
-                Toast.makeText(this, "设备管理员已激活 ✓ 重启功能可免 Root 使用", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "设备管理员已激活 ✓ 重启可免 Root", Toast.LENGTH_LONG).show();
             }
         }
     }
 
     private void updateAdminStatus() {
         if (adminStatusBar == null) return;
-        TextView adminText = adminStatusBar.findViewById(android.R.id.text1);
-        if (adminText != null) {
+        TextView t = findViewById(android.R.id.text1);
+        if (t != null) {
             if (isAdminActive()) {
-                adminText.setText("✓ 设备管理员已激活 · 重启可免 Root");
-                adminText.setTextColor(0xFFA5D6A7);
+                t.setText("✓ 设备管理员已激活 · 重启免 Root");
+                t.setTextColor(0xFFA5D6A7);
             } else {
-                adminText.setText("⚙ 点击激活设备管理员（免 Root 重启）");
-                adminText.setTextColor(0xFFFFCC80);
+                t.setText("⚙ 点击激活设备管理员（免 Root 重启）");
+                t.setTextColor(0xFFFFCC80);
             }
         }
     }
@@ -114,139 +189,219 @@ public class MainActivity extends Activity {
         if (isAdminActive()) return;
         Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
         intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent);
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "激活后 FrostDroidPower 可使用免 Root 重启功能");
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "激活后可使用免 Root 重启功能");
         startActivityForResult(intent, REQUEST_CODE_ADMIN);
     }
 
-    // ========== 重启 ==========
-
     private void doReboot() {
-        // Method 1: Device Admin (API 28+, no root required)
         if (Build.VERSION.SDK_INT >= 28 && isAdminActive()) {
-            try {
-                dpm.reboot(adminComponent);
-                showStatus("正在重启…");
-                return;
-            } catch (SecurityException e) {
-                // Fall through
-            } catch (Exception e) {
-                // Fall through
-            }
+            try { dpm.reboot(adminComponent); showStatus("正在重启…"); return; }
+            catch (Exception ignored) {}
         }
-
-        // Method 2: Device Admin not active - guide user to activate it
         if (Build.VERSION.SDK_INT >= 28 && !isAdminActive()) {
-            showActivateAdminDialog("重启");
-            return;
+            showAdminDialog("重启"); return;
         }
-
-        // Method 3: Root shell (Android 8.x, API 26-27)
-        tryShellReboot();
+        tryShell("reboot", "正在重启…");
     }
-
-    private void tryShellReboot() {
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "reboot"});
-            if (process.waitFor() == 0) { showStatus("正在重启…"); return; }
-        } catch (Exception ignored) {}
-
-        try {
-            Process process = Runtime.getRuntime().exec("reboot");
-            if (process.waitFor() == 0) { showStatus("正在重启…"); return; }
-        } catch (Exception ignored) {}
-
-        showNoPermissionDialog("重启", false);
-    }
-
-    // ========== 关机 ==========
 
     private void doShutdown() {
-        // Shutdown via PowerManager (API 30+, hidden API - may not work)
         if (Build.VERSION.SDK_INT >= 30) {
             try {
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                 if (pm != null) {
-                    // Attempt shutdown via reflection (undocumented, may fail)
                     pm.getClass().getMethod("shutdown", boolean.class, String.class)
                             .invoke(pm, false, "user_request");
-                    showStatus("正在关机…");
-                    return;
+                    showStatus("正在关机…"); return;
                 }
             } catch (Exception ignored) {}
         }
-
-        // Root shell
-        tryShellShutdown();
+        tryShell(new String[]{"su", "-c", "reboot -p"}, "正在关机…");
     }
 
-    private void tryShellShutdown() {
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "reboot -p"});
-            if (process.waitFor() == 0) { showStatus("正在关机…"); return; }
-        } catch (Exception ignored) {}
-
-        try {
-            Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "svc power shutdown"});
-            if (process.waitFor() == 0) { showStatus("正在关机…"); return; }
-        } catch (Exception ignored) {}
-
-        showNoPermissionDialog("关机", true);
+    private void tryShell(final String cmd, final String msg) {
+        tryShell(new String[]{cmd}, msg);
     }
 
-    // ========== UI 辅助 ==========
-
-    private void showConfirmDialog(String title, String message, final Runnable onConfirm) {
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+    private void tryShell(final String[] cmd, final String msg) {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Process p = Runtime.getRuntime().exec(cmd);
+                    if (p.waitFor() == 0) { showStatus(msg); return; }
+                } catch (Exception ignored) {}
+                runOnUiThread(new Runnable() {
                     @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        onConfirm.run();
+                    public void run() {
+                        showNoPermDialog();
                     }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+                });
+            }
+        });
+        t.start();
     }
 
-    private void showActivateAdminDialog(String action) {
-        new AlertDialog.Builder(this)
-                .setTitle("需要设备管理员权限")
-                .setMessage("Android 9+ 无需 Root 即可重启，\n" +
-                        "只需激活 FrostDroidPower 为设备管理员。\n\n" +
-                        "点击「去激活」→ 按步骤开启即可。")
-                .setPositiveButton("去激活", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        requestAdmin();
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
-    }
+    // ======== 工具网格 ========
 
-    private void showNoPermissionDialog(String action, boolean isShutdown) {
-        String extra = "";
-        if (isShutdown) {
-            extra = "\n\n💡 关机始终需要 Root 权限。\n重启可在 Android 9+ 上免 Root（需激活设备管理员）。";
+    private void buildToolsGrid() {
+        toolsGrid.removeAllViews();
+        int cols = toolsGrid.getColumnCount();
+        if (cols < 1) cols = 3;
+
+        for (int i = 0; i < TOOLS.length; i++) {
+            final int index = i;
+            View item = getLayoutInflater().inflate(R.layout.tool_item, null);
+            TextView icon = item.findViewById(R.id.toolIcon);
+            TextView name = item.findViewById(R.id.toolName);
+            icon.setText(TOOLS[i][1]);
+            name.setText(TOOLS[i][0]);
+
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = 0;
+            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+            lp.setMargins(4, 4, 4, 4);
+            item.setLayoutParams(lp);
+
+            item.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openTool(index);
+                }
+            });
+
+            toolsGrid.addView(item);
         }
+    }
+
+    private void openTool(int index) {
+        switch (index) {
+            case 0: // 水平仪
+                startActivity(new Intent(this, ToolsActivity.class)
+                        .putExtra("tool", "level"));
+                break;
+            case 1: // 尺子
+                startActivity(new Intent(this, ToolsActivity.class)
+                        .putExtra("tool", "ruler"));
+                break;
+            case 2: // 剪贴板
+                showClipboard();
+                break;
+            case 9: // 单位换算
+                startActivity(new Intent(this, ToolsActivity.class)
+                        .putExtra("tool", "converter"));
+                break;
+            case 10: // 倒计时
+                startActivity(new Intent(this, ToolsActivity.class)
+                        .putExtra("tool", "countdown"));
+                break;
+            case 11: // 白噪音
+                startActivity(new Intent(this, ToolsActivity.class)
+                        .putExtra("tool", "noise"));
+                break;
+            default:
+                showComingSoon(TOOLS[index][0]);
+                break;
+        }
+    }
+
+    private void showComingSoon(String name) {
         new AlertDialog.Builder(this)
-                .setTitle("权限不足")
-                .setMessage("无法执行「" + action + "」。\n\n" +
-                        "需要以下条件之一：\n" +
-                        "• 激活设备管理员（重启专用，无需 Root）\n" +
-                        "• 设备已获取 Root 权限\n" +
-                        "• 应用为系统级应用" + extra)
+                .setTitle(name)
+                .setMessage(getString(R.string.coming_soon_desc))
                 .setPositiveButton("知道了", null)
                 .show();
     }
 
-    private void showStatus(String msg) {
-        if (statusText != null) {
-            statusText.setText(msg);
-            statusText.setVisibility(View.VISIBLE);
+    private void showClipboard() {
+        final android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) return;
+
+        android.content.ClipData clip = cm.getPrimaryClip();
+        String current = "";
+        if (clip != null && clip.getItemCount() > 0) {
+            current = clip.getItemAt(0).coerceToText(this).toString();
         }
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 20);
+
+        final TextView edit = new TextView(this);
+        edit.setText(current.isEmpty() ? "(剪贴板为空)" : current);
+        edit.setTextColor(0xFFFFFFFF);
+        edit.setTextSize(16);
+        edit.setBackgroundColor(0x20FFFFFF);
+        edit.setPadding(16, 16, 16, 16);
+        edit.setGravity(Gravity.CENTER_VERTICAL);
+        edit.setMinHeight(80);
+
+        layout.addView(edit);
+
+        new AlertDialog.Builder(this)
+                .setTitle("剪贴板管理")
+                .setView(layout)
+                .setPositiveButton("复制到剪贴板", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String text = edit.getText().toString();
+                        if (!text.isEmpty() && !text.equals("(剪贴板为空)")) {
+                            android.content.ClipData clip =
+                                    android.content.ClipData.newPlainText("label", text);
+                            cm.setPrimaryClip(clip);
+                            Toast.makeText(MainActivity.this, "已复制 ✓", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("关闭", null)
+                .show();
+    }
+
+    // ======== UI 辅助 ========
+
+    private void showConfirm(String title, String msg, final Runnable action) {
+        new AlertDialog.Builder(this)
+                .setTitle(title).setMessage(msg)
+                .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) { action.run(); }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showAdminDialog(String action) {
+        new AlertDialog.Builder(this)
+                .setTitle("需要设备管理员权限")
+                .setMessage("Android 9+ 无需 Root 即可" + action + "，\n激活 FrostDroidPower 为设备管理员即可。")
+                .setPositiveButton("去激活", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) { requestAdmin(); }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void showNoPermDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("权限不足")
+                .setMessage("需要 Root 权限或系统级签名。\n\n" +
+                        "💡 重启可在 Android 9+ 上免 Root（需激活设备管理员）。")
+                .setPositiveButton("知道了", null)
+                .show();
+    }
+
+    private void showStatus(final String msg) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (statusText != null) {
+                    statusText.setText(msg);
+                    statusText.setVisibility(View.VISIBLE);
+                }
+                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }
