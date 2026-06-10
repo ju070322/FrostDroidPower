@@ -48,6 +48,12 @@ public class ToolsActivity extends Activity {
     private String toolType;
     private TextView titleText;
     private LinearLayout contentArea;
+    private SensorManager sensorManager;
+    private SensorEventListener levelListener;
+    private TextView cpuText;
+    private Runnable cpuUpdater;
+    private TextView txText;
+    private Runnable networkUpdater;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,18 +106,33 @@ public class ToolsActivity extends Activity {
         else showUnavail();
     }
 
+    @Override
+    protected void onDestroy() {
+        if (sensorManager != null && levelListener != null) {
+            sensorManager.unregisterListener(levelListener);
+        }
+        if (cpuText != null && cpuUpdater != null) {
+            cpuText.removeCallbacks(cpuUpdater);
+        }
+        if (txText != null && networkUpdater != null) {
+            txText.removeCallbacks(networkUpdater);
+        }
+        super.onDestroy();
+    }
+
     // === LEVEL ===
     private void buildLevel() {
         titleText.setText("水平仪");
-        SensorManager sm = (SensorManager) getSystemService(SENSOR_SERVICE);
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         LevelView lv = new LevelView(this);
         contentArea.addView(lv, new LinearLayout.LayoutParams(-1, 500));
-        SensorEventListener listener = new SensorEventListener() {
+        levelListener = new SensorEventListener() {
             @Override public void onSensorChanged(SensorEvent e) { if (e.sensor.getType() == Sensor.TYPE_ACCELEROMETER) lv.setTilt(e.values[0], e.values[1]); }
             @Override public void onAccuracyChanged(Sensor s, int a) {}
         };
-        Sensor accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        if (accel != null) sm.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME);
+        Sensor accel = sensorManager != null ? sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) : null;
+        if (accel != null) sensorManager.registerListener(levelListener, accel, SensorManager.SENSOR_DELAY_GAME);
+        else addInfo("No accelerometer found on this device");
         addInfo("将手机平放，气泡居中表示水平");
     }
 
@@ -310,7 +331,7 @@ public class ToolsActivity extends Activity {
     // === CPU MONITOR ===
     private void buildCpuMonitor() {
         titleText.setText("CPU Monitor");
-        final TextView cpuText = new TextView(this);
+        cpuText = new TextView(this);
         cpuText.setTextColor(0xFFFFFFFF); cpuText.setTextSize(32);
         cpuText.setGravity(Gravity.CENTER); cpuText.setPadding(0,30,0,10);
         contentArea.addView(cpuText);
@@ -318,7 +339,7 @@ public class ToolsActivity extends Activity {
         info.setTextColor(0xB0FFFFFF); info.setTextSize(14); info.setGravity(Gravity.CENTER);
         info.setText("Cores: " + Runtime.getRuntime().availableProcessors());
         contentArea.addView(info);
-        final Runnable updater = new Runnable() {
+        cpuUpdater = new Runnable() {
             long prevIdle=0, prevTotal=0;
             @Override public void run() {
                 try {
@@ -335,17 +356,17 @@ public class ToolsActivity extends Activity {
                         prevIdle = idle; prevTotal = total;
                     }
                 } catch (Exception e) { cpuText.setText("N/A"); }
-                cpuText.postDelayed(this, 2000);
+                if (!isFinishing()) cpuText.postDelayed(this, 2000);
             }
         };
-        updater.run();
+        cpuUpdater.run();
         addInfo("No permissions needed");
     }
 
     // === NETWORK MONITOR ===
     private void buildNetworkMonitor() {
         titleText.setText("Network Speed");
-        final TextView txText = new TextView(this);
+        txText = new TextView(this);
         txText.setTextColor(0xFFFFFFFF); txText.setTextSize(18);
         txText.setGravity(Gravity.CENTER); txText.setPadding(0,30,0,10);
         contentArea.addView(txText);
@@ -353,7 +374,7 @@ public class ToolsActivity extends Activity {
         rxText.setTextColor(0xB0FFFFFF); rxText.setTextSize(18);
         rxText.setGravity(Gravity.CENTER);
         contentArea.addView(rxText);
-        final Runnable updater = new Runnable() {
+        networkUpdater = new Runnable() {
             long prevTx = TrafficStats.getTotalTxBytes();
             long prevRx = TrafficStats.getTotalRxBytes();
             @Override public void run() {
@@ -362,10 +383,10 @@ public class ToolsActivity extends Activity {
                 txText.setText("Upload: " + (tx-prevTx)/1024 + " KB/s");
                 rxText.setText("Download: " + (rx-prevRx)/1024 + " KB/s");
                 prevTx = tx; prevRx = rx;
-                txText.postDelayed(this, 1000);
+                if (!isFinishing()) txText.postDelayed(this, 1000);
             }
         };
-        updater.run();
+        networkUpdater.run();
         addInfo("No permissions needed");
     }
 
@@ -442,15 +463,36 @@ public class ToolsActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_REQUEST);
             permGate("ACCESS_FINE_LOCATION"); return;
         }
+        if (Build.VERSION.SDK_INT >= 28) {
+            android.location.LocationManager lm =
+                    (android.location.LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            boolean locationEnabled = lm != null && lm.isLocationEnabled();
+            if (!locationEnabled) {
+                addInfo("Location service must be enabled for WiFi scan results on Android 9+.");
+                Button b = new Button(this, null, android.R.attr.buttonStyleSmall);
+                b.setText("Open Location Settings");
+                b.setTextColor(0xFFFFFFFF);
+                b.setBackgroundResource(R.drawable.glass_card);
+                b.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                    }
+                });
+                contentArea.addView(b);
+                return;
+            }
+        }
         scanWifi();
     }
     private void scanWifi() {
         WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         if (wm == null) { addInfo("WiFi N/A"); return; }
-        wm.startScan();
+        boolean scanStarted = wm.startScan();
         List<ScanResult> results = wm.getScanResults();
         if (results == null || results.isEmpty()) {
-            addInfo("No networks found. Press back and try again.");
+            addInfo(scanStarted
+                    ? "Scan started, but no cached networks are available yet. Try again in a few seconds."
+                    : "WiFi scan is throttled or blocked by the system. Try again later.");
             return;
         }
         Collections.sort(results, (a,b) -> b.level - a.level);
@@ -481,6 +523,8 @@ public class ToolsActivity extends Activity {
         if (code == PERMISSION_REQUEST && res.length>0 && res[0]==0) {
             Toast.makeText(this, "Permission granted", 0).show();
             recreate();
+        } else if (code == PERMISSION_REQUEST) {
+            Toast.makeText(this, "Permission denied", 0).show();
         }
     }
 

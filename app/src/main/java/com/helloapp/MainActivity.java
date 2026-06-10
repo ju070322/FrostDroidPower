@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
         {"私密相册",    "\uD83D\uDCF8"},
         {"垃圾清理",    "\uD83D\uDDD1\uFE0F"},
         {"CPU监控",     "\u2699\uFE0F"},
+        {"网络测速",     "\uD83D\uDCE1"},
         {"WiFi分析仪",  "\uD83D\uDCF6"},
         {"单位换算",    "\uD83D\uDCCA"},
         {"倒计时/纪念日","\u23F3"},
@@ -162,7 +163,7 @@ public class MainActivity extends Activity {
         if (requestCode == REQUEST_CODE_ADMIN) {
             updateAdminStatus();
             if (isAdminActive()) {
-                Toast.makeText(this, "设备管理员已激活 ✓ 重启可免 Root", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "设备管理员已激活。免 Root 重启仍需要设备所有者模式。", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -172,10 +173,15 @@ public class MainActivity extends Activity {
         TextView t = findViewById(android.R.id.text1);
         if (t != null) {
             if (isAdminActive()) {
-                t.setText("✓ 设备管理员已激活 · 重启免 Root");
-                t.setTextColor(0xFFA5D6A7);
+                if (isDeviceOwner()) {
+                    t.setText("✓ 设备所有者已激活 · 可免 Root 重启");
+                    t.setTextColor(0xFFA5D6A7);
+                } else {
+                    t.setText("⚠ 设备管理员已激活 · 重启仍需设备所有者或 Root");
+                    t.setTextColor(0xFFFFCC80);
+                }
             } else {
-                t.setText("⚙ 点击激活设备管理员（免 Root 重启）");
+                t.setText("⚙ 点击激活设备管理员（普通安装不能直接免 Root 重启）");
                 t.setTextColor(0xFFFFCC80);
             }
         }
@@ -185,23 +191,24 @@ public class MainActivity extends Activity {
         return dpm != null && dpm.isAdminActive(adminComponent);
     }
 
+    private boolean isDeviceOwner() {
+        return dpm != null && Build.VERSION.SDK_INT >= 21 && dpm.isDeviceOwnerApp(getPackageName());
+    }
+
     private void requestAdmin() {
         if (isAdminActive()) return;
         Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
         intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent);
-        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "激活后可使用免 Root 重启功能");
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "激活后可使用设备管理功能。免 Root 重启需要设备所有者模式。");
         startActivityForResult(intent, REQUEST_CODE_ADMIN);
     }
 
     private void doReboot() {
-        if (Build.VERSION.SDK_INT >= 28 && isAdminActive()) {
+        if (Build.VERSION.SDK_INT >= 24 && isAdminActive() && isDeviceOwner()) {
             try { dpm.reboot(adminComponent); showStatus("正在重启…"); return; }
             catch (Exception ignored) {}
         }
-        if (Build.VERSION.SDK_INT >= 28 && !isAdminActive()) {
-            showAdminDialog("重启"); return;
-        }
-        tryShell("reboot", "正在重启…");
+        tryShell(new String[]{"su", "-c", "reboot"}, "正在重启…");
     }
 
     private void doShutdown() {
@@ -275,7 +282,7 @@ public class MainActivity extends Activity {
     }
 
     private void openTool(int index) {
-        String[] toolIds = {"level","ruler","clipboard","floatball","applock","album","cleaner","cpu","wifi","converter","countdown","noise","gif","ocr","ringtone","collage","clone"};
+        String[] toolIds = {"level","ruler","clipboard","floatball","applock","album","cleaner","cpu","network","wifi","converter","countdown","noise","gif","ocr","ringtone","collage","clone"};
         String id = (index < toolIds.length) ? toolIds[index] : "";
         if ("clipboard".equals(id)) {
             showClipboard();
@@ -353,7 +360,7 @@ public class MainActivity extends Activity {
     private void showAdminDialog(String action) {
         new AlertDialog.Builder(this)
                 .setTitle("需要设备管理员权限")
-                .setMessage("Android 9+ 无需 Root 即可" + action + "，\n激活 FrostDroidPower 为设备管理员即可。")
+                .setMessage(action + "需要设备所有者模式或 Root 权限。\n普通设备管理员激活后仍可能无法执行。")
                 .setPositiveButton("去激活", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) { requestAdmin(); }
